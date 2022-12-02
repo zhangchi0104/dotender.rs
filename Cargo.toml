@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "dotender",
+    "dotender_lib",
+]
+
