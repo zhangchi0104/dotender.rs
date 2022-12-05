@@ -3,6 +3,7 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub version: u16,
+    #[serde(alias = "d")]
     pub dotfiles: HashMap<String, ConfigItem>,
 }
 

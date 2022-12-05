@@ -1,5 +1,5 @@
-use super::{Config, Error};
+use super::Config;
 
 pub trait Command {
-    fn run<'a>(&mut self, cfg: &'a mut Config) -> Result<(), Error<'a>>;
+    fn run(&mut self, cfg: &mut Config);
 }

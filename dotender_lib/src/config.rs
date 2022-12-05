@@ -5,11 +5,16 @@ use std::{
     path::Path,
     process,
 };
-
+pub const CONFIG_VERSION: u16 = 1;
 pub fn parse_config<'a>(path: impl AsRef<Path>) -> Result<Config, Error<'a>> {
     let mut buf = String::new();
     fs::File::open(path)?.read_to_string(&mut buf)?;
-    Ok(toml::from_str::<Config>(buf.as_str())?)
+    let config = toml::from_str::<Config>(buf.as_str())?;
+    if config.version != CONFIG_VERSION {
+        Err(Error::InvalidConfigVersion(config.version))
+    } else {
+        Ok(config)
+    }
 }
 
 pub fn write_config(conf: &Config, path: impl AsRef<Path>) -> Result<(), Error> {
