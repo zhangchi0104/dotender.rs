@@ -31,9 +31,6 @@ impl<'ui> InstallUI<'ui> {
             state: InstallUIState(None),
         }
     }
-    pub fn done_with_msg(&self, msg: &'static str) {
-        self.pbar.finish_with_message(msg);
-    }
 }
 
 impl<'state> super::StatefulUI<InstallStep<'state>> for InstallUI<'state> {
@@ -45,6 +42,9 @@ impl<'state> super::StatefulUI<InstallStep<'state>> for InstallUI<'state> {
             .as_ref()
             .map(|step| Some(self.pbar.set_message(format!("{step}"))));
         self.pbar.inc(1);
+    }
+    fn done_with_msg(&mut self, msg: &'static str) {
+        self.pbar.finish_with_message(msg);
     }
 }
 

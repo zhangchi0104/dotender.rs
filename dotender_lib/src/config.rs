@@ -22,10 +22,14 @@ pub fn write_config(conf: &Config, path: impl AsRef<Path>) -> Result<(), Error> 
     Ok(fs::File::open(path)?.write_all(res.as_bytes())?)
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 pub fn parse_hook(value: &str) -> Result<process::Command, Error> {
-    let mut args = value.split(' ');
-    let exec = args.next().ok_or(Error::HookParsingError(value))?;
-    let mut cmd = process::Command::new(exec);
+    let shell = match std::env::var("SHELL") {
+        Ok(val) => val,
+        Err(_) => String::from("/bin/sh"),
+    };
+    let mut cmd = process::Command::new(shell);
+    let args = vec!["-c", value];
     cmd.args(args);
     Ok(cmd)
 }

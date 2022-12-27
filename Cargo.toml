@@ -2,6 +2,5 @@
 members = [
     "dotender",
     "dotender_lib",
-    "test_suites",
 ]
 
