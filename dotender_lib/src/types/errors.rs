@@ -43,6 +43,7 @@ pub enum Error<'error> {
     HookExecutionError(HookExecutionError<'error>),
     InvalidPath(&'error str),
     Unexpected(String),
+    InvalidItem(&'error str),
 }
 
 impl<'a> From<std::io::Error> for Error<'a> {
@@ -83,6 +84,7 @@ impl<'a> Display for Error<'a> {
             }
             Error::InvalidPath(path) => writeln!(f, "Invalid path: {path}"),
             Error::Unexpected(e) => writeln!(f, "{e}"),
+            Error::InvalidItem(key) => writeln!(f, "No configuration found for '{key}'"),
         }
     }
 }

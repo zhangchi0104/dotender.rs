@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::{collections::HashMap, env, hash::Hash, path::PathBuf};
 
 use crate::types::Error;
 
@@ -43,4 +43,17 @@ pub fn absolute_path(path: &str) -> Result<PathBuf, Error> {
         Ok(())
     })?;
     Ok(res)
+}
+
+pub fn find_invalid_keys<'items, K, V>(
+    items: impl IntoIterator<Item = &'items K>,
+    dict: &HashMap<K, V>,
+) -> Option<&'items K>
+where
+    K: Eq + Hash + Default,
+{
+    items.into_iter().fold(None, |x, y| match x {
+        Some(_) => x,
+        None => (!dict.contains_key(&y)).then_some(&y),
+    })
 }

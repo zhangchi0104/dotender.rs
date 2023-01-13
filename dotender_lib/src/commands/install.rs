@@ -1,5 +1,7 @@
 use std::{fs::create_dir_all, process};
 
+use crate::ui::install::InstallStep::Link;
+use crate::utils::find_invalid_keys;
 use crate::{
     config::parse_hook,
     types::{
@@ -17,9 +19,10 @@ use crate::{
 };
 use indicatif::{MultiProgress, ProgressBar};
 use rayon::prelude::*;
+
 #[derive(Debug)]
 pub struct Install {
-    args: args::InstallArgs,
+    pub(super) args: args::InstallArgs,
 }
 
 impl Install {
@@ -32,7 +35,7 @@ impl Install {
             let mut cmd = parse_hook(hook)?;
             update_with(hook);
 
-            if self.args.dry_run {
+            if self.args.dry_run || self.args.skip_hooks {
                 return Ok(());
             }
 
@@ -64,6 +67,7 @@ impl Install {
             .try_for_each(|mapping| {
                 let (src, dst) = mapping?;
                 self.create_link(src, dst)?;
+                ui.update(Link(src, dst));
                 Ok::<(), Error>(())
             })?;
 
@@ -75,7 +79,7 @@ impl Install {
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
-    fn create_link<'a>(&self, origin: &'a str, dst: &'a str) -> Result<(), Error<'a>> {
+    pub(crate) fn create_link<'a>(&self, origin: &'a str, dst: &'a str) -> Result<(), Error<'a>> {
         use std::os::unix::fs;
         if self.args.dry_run {
             return Ok(());
@@ -102,12 +106,20 @@ impl Install {
 impl types::Command for Install {
     fn run(&mut self, cfg: &mut crate::types::Config) {
         let m = MultiProgress::new();
-        cfg.dotfiles.par_iter().for_each(|(k, v)| {
-            // println!("{k}");
+        // check if items are valid
+        let invalid_key = find_invalid_keys(&self.args.items, &cfg.dotfiles);
+
+        if let Some(k) = invalid_key {
+            eprintln!("install failed: {}", Error::InvalidItem(k.as_str()))
+        }
+
+        // println!("{k}");
+        self.args.items.par_iter().for_each(|k| {
             let pb = m.add(ProgressBar::new_spinner());
+            let config = cfg.dotfiles.get(k).unwrap();
             pb.set_prefix(k.to_string());
             let mut ui = InstallUI::from(pb);
-            let res = self.do_install(v, &mut ui);
+            let res = self.do_install(config, &mut ui);
             match res {
                 Ok(_) => ui.done_with_msg("Done"),
                 Err(e) => ui.pbar.set_message(format!("Failed: {e}")),
@@ -132,11 +144,11 @@ mod tests {
     use std::{fs, io::Read, ops::Deref, path::PathBuf};
     struct TestUI;
     impl StatefulUI<InstallStep<'_>> for TestUI {
-        fn done_with_msg(&mut self, _msg: &'static str) {
+        fn update(&mut self, _new_state: InstallStep<'_>) {
             ()
         }
 
-        fn update(&mut self, _new_state: InstallStep<'_>) {
+        fn done_with_msg(&mut self, _msg: &'static str) {
             ()
         }
     }
@@ -198,6 +210,7 @@ mod tests {
                 parent: false,
                 dry_run: false,
                 items: vec![String::from("zsh")],
+                skip_hooks: false,
             }),
             "./foo_link_override_force.txt",
         );
@@ -338,5 +351,29 @@ mod tests {
         let result = fixture.do_install(&config, &mut ui);
         assert!(result.is_err());
         assert!(!PathBuf::from(fixture.link).exists());
+    }
+
+    #[test]
+    fn test_do_install_skip_hooks() {
+        let fixture = install_fixture(
+            Some(InstallArgs {
+                force: false,
+                parent: false,
+                dry_run: false,
+                items: vec![String::from("zsh")],
+                skip_hooks: true,
+            }),
+            "./test_do_install_skip_hooks.txt",
+        );
+        let config = ConfigItem {
+            mappings: vec![format!("./Cargo.toml:{}", fixture.link)],
+            before: Some(vec![String::from("touch pre_install.txt")]),
+            after: Some(vec![String::from("touch post_install.txt")]),
+        };
+        let mut ui = TestUI {};
+        let res = fixture.do_install(&config, &mut ui);
+        assert!(res.is_ok());
+        assert!(!PathBuf::from("pre_install.txt").exists());
+        assert!(!PathBuf::from("post_install.txt").exists());
     }
 }
